@@ -64,15 +64,32 @@ def get_next_event(service):
     for elem in events:
         if 'group.v.calendar.google.com' in elem['calendar']:
             continue
-        print('next event from ' + elem['calendar'] + '\n' + elem['event']['summary'] + ' on ' + str(elem['event']['start']))
+        try:
+            start = elem['event']['start']['dateTime']
+            start = datetime.datetime.strptime(start, '%Y-%m-%dT%H:%M:%S%z')
+            now = datetime.datetime.now().astimezone(start.tzinfo)
+        except:
+            start = elem['event']['start']['date']
+            start = datetime.datetime.strptime(start, '%Y-%m-%d').date()
+            now = datetime.date.today()
 
+        time_delta = start - now
+        seconds = time_delta.seconds % 60
+        minutes = time_delta.seconds // 60 % 60
+        hours = time_delta.seconds // 60 // 60
+
+        calendar = elem['calendar'] if 'sv4ongbp9nh3g2h1o4r529o5h2hetehq' not in elem['calendar'] else 'KIT'
+
+        prefix = 'next event in ' + str(time_delta.days) + ' days, ' + str(hours) + ' hours, ' + str(minutes) + ' minutes, ' + str(seconds) + ' seconds' if not time_delta.days == seconds == minutes == hours == 0 else 'ongoing event '
+        print(calendar + '\n' + prefix)
+        print(elem['event']['summary'])
 
 def main():
     try:
         service = build('calendar', 'v3', credentials=get_credentials())
-        print('looking for events today...')
-        get_events_today(service)
-        print('looking for next event')
+        #print('looking for events today...')
+        #get_events_today(service)
+        print('looking for next event...')
         get_next_event(service)
     except Exception as e:
         print('smth went wrong')
