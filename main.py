@@ -1,6 +1,5 @@
 import os
 import datetime
-from google.auth.transport import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -32,24 +31,49 @@ def get_available_calendars(service):
     return calendars['items']
 
 
-def get_events_from_calendar(service, calendar_id='primary'):
+def get_events_from_today(service, calendar_id='primary'):
     now = datetime.datetime.utcnow().isoformat() + 'Z'
     end_of_today = datetime.datetime.utcnow() + datetime.timedelta(days=1)
     end_of_today = end_of_today.isoformat() + 'Z'
     return service.events().list(calendarId=calendar_id, timeMin=now, timeMax=end_of_today).execute().get('items', [])
 
 
+def get_next_event_specific(service, calendar_id='primary'):
+    now = datetime.datetime.utcnow().isoformat() + 'Z'
+    return service.events().list(calendarId=calendar_id, timeMin=now, maxResults=1, orderBy='startTime', singleEvents=True).execute().get('items', [])[0]
+
+
+def get_events_today(service):
+    calendars = get_available_calendars(service)
+    out = []
+    for elem in calendars:
+        events = get_events_from_today(service, elem['id'])
+        if len(events) == 0:
+            print('no upcoming events')
+        for event in events:
+            print(event['summary'], ' at ', event['start'], '\n', event['htmlLink'])
+            out.append(event)
+    return out
+
+
+def get_next_event(service):
+    events = []
+    for elem in get_available_calendars(service):
+        events.append({'calendar': elem["id"], 'event': get_next_event_specific(service, elem["id"])})
+
+    for elem in events:
+        if 'group.v.calendar.google.com' in elem['calendar']:
+            continue
+        print('next event from ' + elem['calendar'] + '\n' + elem['event']['summary'] + ' on ' + str(elem['event']['start']))
+
+
 def main():
     try:
         service = build('calendar', 'v3', credentials=get_credentials())
-        calendars = get_available_calendars(service)
-        for elem in calendars:
-            print('fetching data for: ', elem['id'])
-            events = get_events_from_calendar(service, elem['id'])
-            if len(events) == 0:
-                print('no upcoming events')
-            for event in events:
-                print(event['summary'], ' at ', event['start'], '\n', event['htmlLink'])
+        print('looking for events today...')
+        get_events_today(service)
+        print('looking for next event')
+        get_next_event(service)
     except Exception as e:
         print('smth went wrong')
         print(e)
